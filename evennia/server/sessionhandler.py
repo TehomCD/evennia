@@ -21,7 +21,7 @@ from evennia.commands.cmdhandler import CMD_LOGINSTART
 from evennia.utils.logger import log_trace
 from evennia.utils.utils import (variable_from_module, is_iter,
                                  to_str, to_unicode,
-                                 make_iter,
+                                 make_iter, delay,
                                  callables_from_module)
 from evennia.utils.inlinefuncs import parse_inlinefunc
 
@@ -65,6 +65,7 @@ from django.utils.translation import ugettext as _
 _SERVERNAME = settings.SERVERNAME
 _MULTISESSION_MODE = settings.MULTISESSION_MODE
 _IDLE_TIMEOUT = settings.IDLE_TIMEOUT
+_DELAY_CMD_LOGINSTART = settings.DELAY_CMD_LOGINSTART
 _MAX_SERVER_COMMANDS_PER_SECOND = 100.0
 _MAX_SESSION_COMMANDS_PER_SECOND = 5.0
 _MODEL_MAP = None
@@ -274,6 +275,16 @@ class ServerSessionHandler(SessionHandler):
         self.server = None
         self.server_data = {"servername": _SERVERNAME}
 
+    def _run_cmd_login(self, session):
+        """
+        Launch the CMD_LOGINSTART command. This is wrapped
+        for delays.
+
+        """
+        if not session.logged_in:
+            self.data_in(session, text=[[CMD_LOGINSTART], {}])
+
+
     def portal_connect(self, portalsessiondata):
         """
         Called by Portal when a new session has connected.
@@ -309,8 +320,9 @@ class ServerSessionHandler(SessionHandler):
                 sess.logged_in = False
                 sess.uid = None
 
-        # show the first login command
-        self.data_in(sess, text=[[CMD_LOGINSTART], {}])
+        # show the first login command, may delay slightly to allow
+        # the handshakes to finish.
+        delay(_DELAY_CMD_LOGINSTART, self._run_cmd_login, sess)
 
     def portal_session_sync(self, portalsessiondata):
         """
@@ -537,6 +549,22 @@ class ServerSessionHandler(SessionHandler):
                                                                 operation=SSYNC,
                                                                 sessiondata=sessdata,
                                                                 clean=False)
+
+    def session_portal_partial_sync(self, session_data):
+        """
+        Call to make a partial update of the session, such as only a particular property.
+
+        Args:
+            session_data (dict): Store `{sessid: {property:value}, ...}` defining one or
+                more sessions in detail.
+
+        """
+        return self.server.amp_protocol.send_AdminServer2Portal(DUMMYSESSION,
+                                                                operation=SSYNC,
+                                                                sessiondata=session_data,
+                                                                clean=False)
+
+
 
     def disconnect_all_sessions(self, reason="You have been disconnected."):
         """
