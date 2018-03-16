@@ -568,6 +568,9 @@ class CmdDesc(COMMAND_DEFAULT_CLASS):
         if not obj:
             return
 
+        if not (obj.access(self.caller, 'control') or obj.access(self.caller, 'edit')):
+            self.caller.msg("You don't have permission to edit the description of %s." % obj.key)
+
         self.caller.db.evmenu_target = obj
         # launch the editor
         EvEditor(self.caller, loadfunc=_desc_load, savefunc=_desc_save,
@@ -597,7 +600,7 @@ class CmdDesc(COMMAND_DEFAULT_CLASS):
             if not obj:
                 return
             desc = self.args
-        if obj.access(caller, "edit"):
+        if (obj.access(self.caller, 'control') or obj.access(self.caller, 'edit')):
             obj.db.desc = desc
             caller.msg("The description was set on %s." % obj.get_display_name(caller))
         else:
@@ -1617,6 +1620,10 @@ class CmdSetAttribute(ObjManipCommand):
         result = []
         if "edit" in self.switches:
             # edit in the line editor
+            if not (obj.access(self.caller, 'control') or obj.access(self.caller, 'edit')):
+                caller.msg("You don't have permission to edit %s." % obj.key)
+                return
+
             if len(attrs) > 1:
                 caller.msg("The Line editor can only be applied "
                            "to one attribute at a time.")
@@ -1637,12 +1644,18 @@ class CmdSetAttribute(ObjManipCommand):
                 return
             else:
                 # deleting the attribute(s)
+                if not (obj.access(self.caller, 'control') or obj.access(self.caller, 'edit')):
+                    caller.msg("You don't have permission to edit %s." % obj.key)
+                    return
                 for attr in attrs:
                     if not self.check_attr(obj, attr):
                         continue
                     result.append(self.rm_attr(obj, attr))
         else:
             # setting attribute(s). Make sure to convert to real Python type before saving.
+            if not (obj.access(self.caller, 'control') or obj.access(self.caller, 'edit')):
+                caller.msg("You don't have permission to edit %s." % obj.key)
+                return
             for attr in attrs:
                 if not self.check_attr(obj, attr):
                     continue
@@ -1843,13 +1856,13 @@ class CmdLock(ObjManipCommand):
 
     For example:
        'get: id(25) or perm(Admin)'
-    The 'get' access_type is checked by the get command and will
-    an object locked with this string will only be possible to
-    pick up by Admins or by object with id=25.
+    The 'get' lock access_type is checked e.g. by the 'get' command.
+    An object locked with this example lock will only be possible to pick up
+    by Admins or by an object with id=25.
 
     You can add several access_types after one another by separating
     them by ';', i.e:
-       'get:id(25);delete:perm(Builder)'
+       'get:id(25); delete:perm(Builder)'
     """
     key = "@lock"
     aliases = ["@locks"]
@@ -1876,9 +1889,16 @@ class CmdLock(ObjManipCommand):
                 obj = caller.search(objname)
                 if not obj:
                     return
-            if not (obj.access(caller, 'control') or obj.access(caller, "edit")):
+            has_control_access = obj.access(caller, 'control')
+            if access_type == 'control' and not has_control_access:
+                # only allow to change 'control' access if you have 'control' access already
+                caller.msg("You need 'control' access to change this type of lock.")
+                return
+
+            if not has_control_access or obj.access(caller, "edit"):
                 caller.msg("You are not allowed to do that.")
                 return
+
             lockdef = obj.locks.get(access_type)
 
             if lockdef:
@@ -2347,7 +2367,7 @@ class CmdTeleport(COMMAND_DEFAULT_CLASS):
 
     Examples:
       @tel Limbo
-      @tel/quiet box Limbo
+      @tel/quiet box = Limbo
       @tel/tonone box
 
     Switches:
@@ -2363,7 +2383,8 @@ class CmdTeleport(COMMAND_DEFAULT_CLASS):
       loc - teleport object to the target's location instead of its contents
 
     Teleports an object somewhere. If no object is given, you yourself
-    is teleported to the target location.     """
+    is teleported to the target location.
+    """
     key = "@tel"
     aliases = "@teleport"
     locks = "cmd:perm(teleport) or perm(Builder)"

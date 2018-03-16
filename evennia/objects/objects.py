@@ -22,7 +22,7 @@ from evennia.commands import cmdhandler
 from evennia.utils import search
 from evennia.utils import logger
 from evennia.utils.utils import (variable_from_module, lazy_property,
-                                 make_iter, to_unicode, is_iter)
+                                 make_iter, to_unicode, is_iter, to_str)
 from django.utils.translation import ugettext as _
 
 _MULTISESSION_MODE = settings.MULTISESSION_MODE
@@ -205,6 +205,14 @@ class DefaultObject(with_metaclass(TypeclassBase, ObjectDB)):
     @lazy_property
     def sessions(self):
         return ObjectSessionHandler(self)
+
+    @property
+    def is_connected(self):
+        # we get an error for objects subscribed to channels without this
+        if self.account: # seems sane to pass on the account
+            return self.account.is_connected
+        else:
+            return False
 
     @property
     def has_account(self):
@@ -519,6 +527,7 @@ class DefaultObject(with_metaclass(TypeclassBase, ObjectDB)):
                     obj.at_msg_send(text=text, to_obj=self, **kwargs)
                 except Exception:
                     logger.log_trace()
+        kwargs["options"] = options
         try:
             if not self.at_msg_receive(text=text, **kwargs):
                 # if at_msg_receive returns false, we abort message to this object
@@ -526,12 +535,18 @@ class DefaultObject(with_metaclass(TypeclassBase, ObjectDB)):
         except Exception:
             logger.log_trace()
 
-        kwargs["options"] = options
+        if not (isinstance(text, basestring) or isinstance(text, tuple)):
+            # sanitize text before sending across the wire
+            try:
+                text = to_str(text, force_string=True)
+            except Exception:
+                text = repr(text)
 
         # relay to session(s)
         sessions = make_iter(session) if session else self.sessions.all()
         for session in sessions:
             session.data_out(text=text, **kwargs)
+
 
     def for_contents(self, func, exclude=None, **kwargs):
         """
@@ -1705,7 +1720,7 @@ class DefaultObject(with_metaclass(TypeclassBase, ObjectDB)):
                                 for recv in receivers) if receivers else None,
                             "speech": message}
             self_mapping.update(custom_mapping)
-            self.msg(text=(msg_self.format(**self_mapping), {"type": msg_type}))
+            self.msg(text=(msg_self.format(**self_mapping), {"type": msg_type}), from_obj=self)
 
         if receivers and msg_receivers:
             receiver_mapping = {"self": "You",
@@ -1723,7 +1738,8 @@ class DefaultObject(with_metaclass(TypeclassBase, ObjectDB)):
                                             for recv in receivers) if receivers else None}
                 receiver_mapping.update(individual_mapping)
                 receiver_mapping.update(custom_mapping)
-                receiver.msg(text=(msg_receivers.format(**receiver_mapping), {"type": msg_type}))
+                receiver.msg(text=(msg_receivers.format(**receiver_mapping),
+                             {"type": msg_type}), from_obj=self)
 
         if self.location and msg_location:
             location_mapping = {"self": "You",
