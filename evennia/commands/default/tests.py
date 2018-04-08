@@ -293,6 +293,7 @@ class TestBuilding(CommandTest):
 
     def test_find(self):
         self.call(building.CmdFind(), "Room2", "One Match")
+        self.call(building.CmdFind(), "/contains om2", "One Match")
 
     def test_script(self):
         self.call(building.CmdScript(), "Obj = scripts.Script", "Script scripts.Script successfully added")
