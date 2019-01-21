@@ -405,6 +405,12 @@ class AMPProtocol(amp.AMP):
         logger.log_err("AMP Error for %(info)s: %(e)s" % {'info': info,
                                                           'e': e.getErrorMessage()})
 
+    def dataReceived(self, data):
+        try:
+            super(AMPProtocol, self).dataReceived(data)
+        except KeyError:
+            print("CAUGHT SUPER FUCKING ANNOYING AMP FAILURE BUG. HEY. HEY. WE FINALLY CAUGHT IT. HEY.")
+
     def send_data(self, command, sessid, **kwargs):
         """
         Send data across the wire.
