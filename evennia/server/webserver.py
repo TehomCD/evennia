@@ -278,7 +278,10 @@ class WSGIWebServer(internet.TCPServer):
 
         """
         super().stopService()
-        self.pool.stop()
+        try:
+            self.pool.stop()
+        except Exception:
+            pass
 
 
 class PrivateStaticRoot(static.File):
