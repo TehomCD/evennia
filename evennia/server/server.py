@@ -464,6 +464,10 @@ class Evennia(object):
         if hasattr(self, "web_root"):  # not set very first start
             yield self.web_root.empty_threadpool()
 
+        webservice = self.services.getServiceNamed("EvenniaWebServer5001")
+        if webservice.running:
+            yield webservice.stopService()
+
         if not _reactor_stopping:
             # kill the server
             self.shutdown_complete = True
