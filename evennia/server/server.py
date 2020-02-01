@@ -464,9 +464,11 @@ class Evennia(object):
         if hasattr(self, "web_root"):  # not set very first start
             yield self.web_root.empty_threadpool()
 
-        webservice = self.services.getServiceNamed("EvenniaWebServer5001")
-        if webservice.running:
-            yield webservice.stopService()
+        if hasattr(self, "_webserver_names"):
+            for server_name in self._webserver_names:
+                webservice = self.services.getServiceNamed(server_name)
+                if webservice.running:
+                    yield webservice.stopService()
 
         if not _reactor_stopping:
             # kill the server
@@ -684,13 +686,17 @@ if WEBSERVER_ENABLED:
     web_site.is_portal = False
 
     INFO_DICT["webserver"] = ""
+    webserver_names = []
     for proxyport, serverport in WEBSERVER_PORTS:
         # create the webserver (we only need the port for this)
         webserver = WSGIWebServer(threads, serverport, web_site, interface="127.0.0.1")
-        webserver.setName("EvenniaWebServer%s" % serverport)
+        name = "EvenniaWebServer%s" % serverport
+        webserver.setName(name)
         EVENNIA.services.addService(webserver)
+        webserver_names.append(name)
 
         INFO_DICT["webserver"] += "webserver: %s" % serverport
+    EVENNIA._webserver_names = webserver_names
 
 ENABLED = []
 if IRC_ENABLED:
