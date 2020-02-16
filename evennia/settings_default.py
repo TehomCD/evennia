@@ -231,6 +231,10 @@ MAX_CHAR_LIMIT = 6000
 MAX_CHAR_LIMIT_WARNING = (
     "You entered a string that was too long. " "Please break it up into multiple parts."
 )
+# Number of times we'll re-try starting up if it fails
+MAX_STARTUP_RETRIES = 3
+# How long we'll sleep between retries in whole seconds
+RETRY_DELAY = 5
 # If this is true, errors and tracebacks from the engine will be
 # echoed as text in-game as well as to the log. This can speed up
 # debugging. OBS: Showing full tracebacks to regular users could be a

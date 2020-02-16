@@ -6,6 +6,7 @@ these are the Evennia Server and the evennia launcher).
 """
 import os
 import sys
+import time
 from twisted.internet import protocol
 from evennia.server.portal import amp
 from django.conf import settings
@@ -149,7 +150,7 @@ class AMPServerProtocol(amp.AMPMultiConnectionProtocol):
             # if no server connection is available, broadcast
             return self.broadcast(command, sessid, packed_data=amp.dumps((sessid, kwargs)))
 
-    def start_server(self, server_twistd_cmd):
+    def start_server(self, server_twistd_cmd, retry=0):
         """
         (Re-)Launch the Evennia server.
 
@@ -158,8 +159,9 @@ class AMPServerProtocol(amp.AMPMultiConnectionProtocol):
                 to pass to POpen to start the server.
 
         """
-        # start the Server
-        print("Portal starting server ... {}".format(server_twistd_cmd))
+        if not retry:
+            # start the Server
+            print("Portal starting server ... {}".format(server_twistd_cmd))
         process = None
         with open(settings.SERVER_LOG_FILE, "a") as logfile:
             # we link stdout to a file in order to catch
@@ -184,6 +186,10 @@ class AMPServerProtocol(amp.AMPMultiConnectionProtocol):
                     )
             except Exception:
                 logger.log_trace()
+                if retry < settings.MAX_STARTUP_RETRIES:
+                    logger.log_msg("Startup failed. Retrying in %s seconds." % settings.RETRY_DELAY)
+                    time.sleep(settings.RETRY_DELAY)
+                    return self.start_server(server_twistd_cmd, retry + 1)
 
             self.factory.portal.server_twistd_cmd = server_twistd_cmd
             logfile.flush()
