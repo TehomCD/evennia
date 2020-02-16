@@ -190,6 +190,9 @@ class AMPServerProtocol(amp.AMPMultiConnectionProtocol):
                     logger.log_msg("Startup failed. Retrying in %s seconds." % settings.RETRY_DELAY)
                     time.sleep(settings.RETRY_DELAY)
                     return self.start_server(server_twistd_cmd, retry + 1)
+                else:
+                    logger.log_msg("Too many retries. Failing.")
+                    raise  # re-raise to prevent locking
 
             self.factory.portal.server_twistd_cmd = server_twistd_cmd
             logfile.flush()
