@@ -7,7 +7,7 @@ these are the Evennia Server and the evennia launcher).
 import os
 import sys
 import time
-from twisted.internet import protocol
+from twisted.internet import protocol, reactor
 from evennia.server.portal import amp
 from django.conf import settings
 from subprocess import Popen, STDOUT
@@ -186,13 +186,9 @@ class AMPServerProtocol(amp.AMPMultiConnectionProtocol):
                     )
             except Exception:
                 logger.log_trace()
-                if retry < settings.MAX_STARTUP_RETRIES:
-                    logger.log_msg("Startup failed. Retrying in %s seconds." % settings.RETRY_DELAY)
-                    time.sleep(settings.RETRY_DELAY)
-                    return self.start_server(server_twistd_cmd, retry + 1)
-                else:
-                    logger.log_msg("Too many retries. Failing.")
-                    raise  # re-raise to prevent locking
+
+            if retry < settings.MAX_STARTUP_RETRIES:
+                reactor.callLater(settings.RETRY_DELAY, self.check_if_retry_needed, retry, process)
 
             self.factory.portal.server_twistd_cmd = server_twistd_cmd
             logfile.flush()
@@ -200,6 +196,11 @@ class AMPServerProtocol(amp.AMPMultiConnectionProtocol):
             # avoid zombie-process on Unix/BSD
             process.wait()
         return
+
+    def check_if_retry_needed(self, retry, process):
+        if process.call() is not None:
+            logger.log_msg("Process failed to start. Retrying")
+            self.start_server(retry + 1)
 
     def wait_for_disconnect(self, callback, *args, **kwargs):
         """
