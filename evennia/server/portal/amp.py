@@ -317,6 +317,7 @@ class AMPMultiConnectionProtocol(amp.AMP):
                 _get_logger().log_trace(
                     "Discarded incoming partial (packed) data (len {})".format(len(data))
                 )
+                self.transport.loseConnection()
         elif self.multibatches:
             # invalid AMP, but we have a pending multi-batch that is not yet complete
             if data[-2:] == NULNUL:
@@ -328,6 +329,7 @@ class AMPMultiConnectionProtocol(amp.AMP):
                 _get_logger().log_trace(
                     "Discarded incoming multi-batch (packed) data (len {})".format(len(data))
                 )
+                self.transport.loseConnection()
         else:
             # not an AMP communication, return warning
             self.transport.write(_HTTP_WARNING)

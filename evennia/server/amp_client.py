@@ -23,6 +23,9 @@ class AMPClientFactory(protocol.ReconnectingClientFactory):
     factor = 1.5
     maxDelay = 1
     noisy = False
+    retries = 10  # Number of times Twisted will reconnect
+    reconnecting = False  # To prevent server from rebooting on reconnect
+    continueTrying = True  # Tells Twisted to reconnect
 
     def __init__(self, server):
         """
@@ -74,6 +77,7 @@ class AMPClientFactory(protocol.ReconnectingClientFactory):
 
         """
         logger.log_info("Server disconnected from the portal.")
+        self.reconnecting = True  # Tells the server this is a reconnect not a reboot
         protocol.ReconnectingClientFactory.clientConnectionLost(self, connector, reason)
 
     def clientConnectionFailed(self, connector, reason):
@@ -225,10 +229,13 @@ class AMPServerClientProtocol(amp.AMPMultiConnectionProtocol):
         elif operation == amp.PSYNC:  # portal_session_sync
             # force a resync of sessions from the portal side. This happens on
             # first server-connect.
-            server_restart_mode = kwargs.get("server_restart_mode", "shutdown")
-            self.factory.server.run_init_hooks(server_restart_mode)
-            server_sessionhandler.portal_sessions_sync(kwargs.get("sessiondata"))
-            server_sessionhandler.portal_start_time = kwargs.get("portal_start_time")
+            if self.factory.reconnecting is True:  # Makes the server not do the session handling when it's a reconnect
+                self.factory.reconnecting = False
+            else:
+                server_restart_mode = kwargs.get("server_restart_mode", "shutdown")
+                self.factory.server.run_init_hooks(server_restart_mode)
+                server_sessionhandler.portal_sessions_sync(kwargs.get("sessiondata"))
+                server_sessionhandler.portal_start_time = kwargs.get("portal_start_time")
 
         elif operation == amp.SRELOAD:  # server reload
             # shut down in reload mode
