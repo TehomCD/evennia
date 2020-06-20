@@ -19,9 +19,9 @@ class AMPClientFactory(protocol.ReconnectingClientFactory):
     """
 
     # Initial reconnect delay in seconds.
-    initialDelay = 1
-    factor = 1.5
-    maxDelay = 1
+    initialDelay = 3
+    factor = 2.5
+    maxDelay = 10
     noisy = False
     retries = 10  # Number of times Twisted will reconnect
     reconnecting = False  # To prevent server from rebooting on reconnect
